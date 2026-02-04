@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>The Valentine Password Game</title>
+
+    <!-- ✅ Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
+          "Apple Color Emoji",
+          "Segoe UI Emoji";
+        background: #0b0f17;
+        color: #e8eefc;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 18px 60px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+        letter-spacing: 0.2px;
+      }
+      .sub {
+        opacity: 0.85;
+        margin-bottom: 18px;
+        line-height: 1.35;
+      }
+
+      .panel {
+        background: #121a2a;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 50px;
+        align-items: start;
+      }
+      @media (max-width: 880px) {
+        .row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ---- WORDLE INPUT OVERLAY ---- */
+      .pwWrap {
+        position: relative;
+      }
+
+      /* The colored preview layer */
+      .pwOverlay {
+        position: absolute;
+        inset: 0;
+        padding: 12px 12px;
+        border-radius: 12px;
+        white-space: pre-wrap; /* preserve spaces/newlines */
+        word-wrap: break-word;
+        overflow: hidden;
+
+        font-size: 16px;
+        line-height: 1.4;
+
+        pointer-events: none;
+      }
+
+      .pwOverlay,
+      textarea {
+        font-family: inherit;
+        font-size: 16px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        box-sizing: border-box;
+      }
+
+      /* Match textarea look/metrics */
+      textarea {
+        width: 100%;
+        min-height: 110px;
+        resize: vertical;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #0b1222;
+        padding: 12px 12px;
+        font-size: 16px;
+        line-height: 1.4;
+        outline: none;
+
+        /* Hide textarea text but keep caret visible */
+        color: transparent;
+        caret-color: #e8eefc;
+      }
+      textarea::selection {
+        background: rgba(120, 170, 255, 0.35);
+      }
+      textarea:focus {
+        border-color: rgba(120, 170, 255, 0.5);
+        box-shadow: 0 0 0 3px rgba(120, 170, 255, 0.18);
+      }
+
+      /* Token colors */
+      .tok {
+        padding: 0;
+        border-radius: 6px;
+        box-shadow: 0 0 0 0 transparent;
+      }
+
+      .tok.green {
+        background: rgba(80, 220, 140, 0.18);
+        box-shadow: 0 0 0 1px rgba(80, 220, 140, 0.35) inset;
+        color: #e8eefc;
+      }
+      .tok.yellow {
+        background: rgba(245, 200, 80, 0.16);
+        box-shadow: 0 0 0 1px rgba(245, 200, 80, 0.35) inset;
+        color: #e8eefc;
+      }
+      .tok.red {
+        background: rgba(255, 90, 110, 0.14);
+        box-shadow: 0 0 0 1px rgba(255, 90, 110, 0.35) inset;
+        color: #e8eefc;
+      }
+      .tok.empty {
+        color: rgba(232, 238, 252, 0.55);
+      }
+
+      .stats {
+        display: grid;
+        gap: 10px;
+      }
+      .stat {
+        background: #0b1222;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .label {
+        font-size: 12px;
+        opacity: 0.75;
+        margin-bottom: 6px;
+      }
+      .value {
+        font-size: 16px;
+        font-weight: 650;
+      }
+
+      .legend {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        font-size: 12px;
+        opacity: 0.95;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        display: inline-block;
+      }
+      .dot.green {
+        background: rgba(80, 220, 140, 0.9);
+      }
+      .dot.yellow {
+        background: rgba(245, 200, 80, 0.95);
+      }
+      .dot.red {
+        background: rgba(255, 90, 110, 0.95);
+      }
+
+      .rules {
+        margin-top: 14px;
+      }
+      .rulesHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 12px;
+        opacity: 0.95;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 10px;
+      }
+      li.rule {
+        background: #0b1222;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 10px 12px;
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        gap: 10px;
+        align-items: start;
+      }
+      .icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .good .icon {
+        background: rgba(80, 220, 140, 0.18);
+        border-color: rgba(80, 220, 140, 0.35);
+      }
+      .mid .icon {
+        background: rgba(245, 200, 80, 0.16);
+        border-color: rgba(245, 200, 80, 0.35);
+      }
+      .bad .icon {
+        background: rgba(255, 90, 110, 0.14);
+        border-color: rgba(255, 90, 110, 0.35);
+      }
+
+      .ruleTitle {
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+      .ruleHint {
+        font-size: 13px;
+        opacity: 0.82;
+        line-height: 1.35;
+      }
+      .ruleHint.hidden {
+        display: none;
+      }
+
+      .footer {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+      }
+      button {
+        appearance: none;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+        color: #e8eefc;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:hover {
+        background: rgba(255, 255, 255, 0.09);
+      }
+      .win {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(80, 220, 140, 0.12);
+        border: 1px solid rgba(80, 220, 140, 0.35);
+        font-weight: 750;
+        display: none;
+      }
+      .win.show {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      /* ✅ WIN OVERLAY */
+      .winOverlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(6px);
+        z-index: 9999;
+        padding: 18px;
+      }
+      .winOverlay.show {
+        display: grid;
+      }
+      .winCard {
+        max-width: 560px;
+        width: 100%;
+        background: rgba(18, 26, 42, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 18px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+        padding: 18px;
+        text-align: center;
+      }
+      .winCard h2 {
+        margin: 0 0 10px;
+        font-size: 22px;
+        letter-spacing: 0.2px;
+      }
+      .catGif {
+        width: min(420px, 90vw);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
+        display: block;
+        margin: 12px auto;
+      }
+      .winSmall {
+        opacity: 0.85;
+        margin-top: 8px;
+        font-size: 13px;
+        line-height: 1.35;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>❤️ Alex will you be my Valentine?</h1>
+      <div class="sub">
+        Type the answer to my question. The box will color each word
+        Wordle-style.<br />
+        Green = correct spot, Yellow = wrong spot, Red = not in key.
+      </div>
+
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="pwWrap">
+              <div id="pwOverlay" class="pwOverlay"></div>
+              <textarea
+                id="pw"
+                spellcheck="false"
+                placeholder="Start typing your answer here..."
+              ></textarea>
+            </div>
+
+            <div class="legend">
+              <div class="chip">
+                <span class="dot green"></span>Correct spot
+              </div>
+              <div class="chip"><span class="dot yellow"></span>Wrong spot</div>
+              <div class="chip"><span class="dot red"></span>Not in key</div>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="label">Characters</div>
+              <div class="value" id="charCount">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">Words correct (green)</div>
+              <div class="value" id="passedCount">0 / 0</div>
+            </div>
+            <div class="stat">
+              <div class="label">Next word to solve</div>
+              <div class="value" id="nextUnlock">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rules">
+          <div class="rulesHeader">
+            <div class="pill">Hints reveal progressively</div>
+          </div>
+          <ul id="rulesList"></ul>
+        </div>
+
+        <div class="footer">
+          <div class="win" id="winBanner">
+            ✅ Password accepted. Valentine secured.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ WIN MODAL -->
+    <div class="winOverlay" id="winOverlay" aria-hidden="true">
+      <div class="winCard">
+        <h2>Alex said YES!!! 💘</h2>
+        <h3>See you on the 14th! hehe</h3>
+        <img
+          class="catGif"
+          alt="Celebrating cat"
+          src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExczA5aWo0OHhhcGgxNzMybnZrNmxhb3JoMTJuc20ydnZ4ZDJjNzBiaCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/LcvINMLirZ2Ud1FZis/giphy.gif"
+        />
+        <div class="winSmall">
+          Press <b>Esc</b> to close. (Or just enjoy the cat.)
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const FINAL_PASSWORD =
+        "Yes Dillan I will be your valentine and we will eat chinese food on the 14th";
+
+      const KEY_WORDS = FINAL_PASSWORD.split(/\s+/);
+      const KEY_WORDS_LC = KEY_WORDS.map((w) => w.toLowerCase());
+      const KEY_SET_LC = new Set(KEY_WORDS_LC);
+
+      const WORD_HINTS = [
+        "An enthusiastic opener.",
+        "A name you’d definitely recognize.",
+        "First-person singular nominative",
+        "A first-person promise starts here.",
+        "A short linking verb.",
+        "Something possessive.",
+        "This ones a bit obvious.",
+        "A connector word.",
+        "A two-letter pronoun (plural).",
+        "Dead persons promise",
+        "another word for munch",
+        "A cuisine",
+        "Mmmmm",
+        "A small preposition.",
+        "Most used word ever...",
+        "The day itself",
+      ];
+
+      const splitWords = (s) =>
+        s
+          .trim()
+          .split(/\s+/)
+          .filter((w) => w.length);
+
+      function computeStatuses(userWords) {
+        const statuses = [];
+        const maxLen = Math.max(KEY_WORDS.length, userWords.length);
+
+        for (let i = 0; i < maxLen; i++) {
+          const uw = userWords[i];
+          const kw = KEY_WORDS[i];
+
+          const uwLc = uw ? uw.toLowerCase() : null;
+          const kwLc = kw ? kw.toLowerCase() : null;
+
+          if (!uw) {
+            statuses.push({ state: "empty", userWord: "", keyWord: kw ?? "" });
+            continue;
+          }
+
+          // GREEN: correct word in correct slot (case-insensitive)
+          if (kwLc && uwLc === kwLc) {
+            statuses.push({ state: "green", userWord: uw, keyWord: kw });
+            continue;
+          }
+
+          // YELLOW: word exists somewhere in key (case-insensitive) but not in this slot
+          if (uwLc && KEY_SET_LC.has(uwLc)) {
+            statuses.push({ state: "yellow", userWord: uw, keyWord: kw ?? "" });
+            continue;
+          }
+
+          // RED: not in key
+          statuses.push({ state: "red", userWord: uw, keyWord: kw ?? "" });
+        }
+
+        return statuses;
+      }
+
+      // Overlay renderer that preserves whitespace and colors tokens
+      function renderOverlay(raw, statuses) {
+        const tokens = raw.split(/(\s+)/);
+
+        let wordIdx = 0;
+        const html = tokens
+          .map((t) => {
+            if (/^\s+$/.test(t)) return escapeHtml(t);
+            const st = statuses[wordIdx]?.state ?? "red";
+            wordIdx++;
+            return `<span class="tok ${st}">${escapeHtml(t)}</span>`;
+          })
+          .join("");
+
+        return html.length
+          ? html
+          : `<span class="tok empty">Start typing your password here...</span>`;
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      const pwEl = document.getElementById("pw");
+      const pwOverlayEl = document.getElementById("pwOverlay");
+      const rulesListEl = document.getElementById("rulesList");
+      const charCountEl = document.getElementById("charCount");
+      const passedCountEl = document.getElementById("passedCount");
+      const nextUnlockEl = document.getElementById("nextUnlock");
+      const winBannerEl = document.getElementById("winBanner");
+
+      // ✅ WIN FX elements
+      const winOverlayEl = document.getElementById("winOverlay");
+      let hasCelebrated = false;
+
+      function fireConfettiBurst() {
+        // A couple quick bursts feels great
+        const end = Date.now() + 900;
+        (function frame() {
+          confetti({
+            particleCount: 6,
+            spread: 70,
+            startVelocity: 40,
+            origin: { x: Math.random(), y: 0.9 },
+          });
+          if (Date.now() < end) requestAnimationFrame(frame);
+        })();
+
+        confetti({
+          particleCount: 160,
+          spread: 90,
+          startVelocity: 55,
+          decay: 0.92,
+          scalar: 1.0,
+          origin: { x: 0.5, y: 0.25 },
+        });
+      }
+
+      function setWinOverlay(show) {
+        winOverlayEl.classList.toggle("show", show);
+        winOverlayEl.setAttribute("aria-hidden", show ? "false" : "true");
+      }
+
+      let forceShowNextHint = false;
+
+      function render() {
+        const pw = pwEl.value;
+        charCountEl.textContent = String(pw.length);
+
+        const userWords = splitWords(pw);
+        const statuses = computeStatuses(userWords);
+
+        // Update overlay (colored text)
+        pwOverlayEl.innerHTML = renderOverlay(pw, statuses);
+
+        // Keep overlay scroll synced with textarea
+        pwOverlayEl.scrollTop = pwEl.scrollTop;
+
+        // Count greens
+        let greenCount = 0;
+        for (let i = 0; i < KEY_WORDS.length; i++) {
+          if (statuses[i]?.state === "green") greenCount++;
+        }
+        passedCountEl.textContent = `${greenCount} / ${KEY_WORDS.length}`;
+
+        // next unsolved
+        let nextIdx = -1;
+        for (let i = 0; i < KEY_WORDS.length; i++) {
+          if (statuses[i]?.state !== "green") {
+            nextIdx = i;
+            break;
+          }
+        }
+        nextUnlockEl.textContent =
+          nextIdx === -1
+            ? "All done 🎉"
+            : `Word ${nextIdx + 1} of ${KEY_WORDS.length}`;
+
+        const won =
+          greenCount === KEY_WORDS.length &&
+          pw.trim().toLowerCase() === FINAL_PASSWORD.toLowerCase();
+
+        winBannerEl.classList.toggle("show", won);
+
+        // ✅ WIN FX: confetti + celebrating cat (only once)
+        if (won && !hasCelebrated) {
+          hasCelebrated = true;
+          fireConfettiBurst();
+          setWinOverlay(true);
+        }
+        if (!won) {
+          hasCelebrated = false;
+          setWinOverlay(false);
+        }
+
+        // visible hints: greens + next unsolved
+        const visibleHintIdx = new Set();
+        for (let i = 0; i < KEY_WORDS.length; i++) {
+          if (statuses[i]?.state === "green") visibleHintIdx.add(i);
+        }
+        if (nextIdx !== -1) visibleHintIdx.add(nextIdx);
+
+        // Render hint list
+        rulesListEl.innerHTML = "";
+        for (let i = 0; i < KEY_WORDS.length; i++) {
+          const state = statuses[i]?.state ?? "empty";
+          const userWord = statuses[i]?.userWord ?? "";
+
+          let cls = "bad";
+          let icon = "✕";
+          if (state === "green") {
+            cls = "good";
+            icon = "✓";
+          } else if (state === "yellow") {
+            cls = "mid";
+            icon = "!";
+          } else if (state === "empty") {
+            cls = "bad";
+            icon = "•";
+          }
+
+          const li = document.createElement("li");
+          li.className = `rule ${cls}`;
+          li.dataset.wordIndex = String(i);
+
+          const iconEl = document.createElement("div");
+          iconEl.className = "icon";
+          iconEl.textContent = icon;
+
+          const body = document.createElement("div");
+
+          const title = document.createElement("div");
+          title.className = "ruleTitle";
+          const shown = userWord
+            ? `<code class="inline">${escapeHtml(userWord)}</code>`
+            : "<code class='inline'>_____</code>";
+          title.innerHTML = `Word ${i + 1}: ${shown}`;
+
+          const hint = document.createElement("div");
+          hint.className = "ruleHint";
+          hint.innerHTML = WORD_HINTS[i] ?? "A secret clue.";
+
+          if (!visibleHintIdx.has(i)) hint.classList.add("hidden");
+
+          body.appendChild(title);
+          body.appendChild(hint);
+
+          li.appendChild(iconEl);
+          li.appendChild(body);
+
+          rulesListEl.appendChild(li);
+        }
+
+        forceShowNextHint = false;
+      }
+
+      pwEl.addEventListener("input", render);
+      pwEl.addEventListener("scroll", () => {
+        pwOverlayEl.scrollTop = pwEl.scrollTop;
+      });
+
+      // ✅ Close overlay with ESC or click outside card
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") setWinOverlay(false);
+      });
+      winOverlayEl.addEventListener("click", (e) => {
+        if (e.target === winOverlayEl) setWinOverlay(false);
+      });
+
+      // Seed
+      pwEl.value = "";
+      render();
+      pwEl.focus();
+    </script>
+  </body>
+</html>
